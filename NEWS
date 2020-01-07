@@ -1,3 +1,9 @@
+OpenMCU-ru 4.1.13 (2020-01-07)
+  * fix build with gcc 7+
+  * build docker image
+
+............
+
 OpenMCU-ru 3.48 (2014-05-02)
   * HTTPS (when using ptlib 2.6/2.10);
   * Status page:
