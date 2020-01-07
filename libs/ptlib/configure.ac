@@ -264,6 +264,16 @@ if test x$GXX = xyes ; then
     AC_MSG_RESULT(no)
   fi
 
+  dnl build with gcc 7
+  AC_MSG_CHECKING(checking if gcc 7 should be used)
+  if test ${GXX_MAJOR} -ge 7 ; then
+      STDCXXFLAGS="$STDCXXFLAGS -std=gnu++98"
+      AC_MSG_RESULT(yes)
+  else
+    AC_MSG_RESULT(no)
+  fi
+
+
   dnl only enable PCH for gcc 4.0 and later
   AC_MSG_CHECKING(checking if precompiled headers available)
   if test ${GXX_MAJOR} -lt 4 ; then

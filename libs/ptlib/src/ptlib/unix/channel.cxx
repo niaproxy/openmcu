@@ -162,6 +162,9 @@
 #include <ptlib.h>
 #include <sys/ioctl.h>
 
+/* gcc 7+ patch */
+#include <sys/uio.h>
+#include <unistd.h>
 
 #include "../common/pchannel.cxx"
 
