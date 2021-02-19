@@ -143,7 +143,7 @@ int tport_stream_init_primary(tport_primary_t *pri,
   /* Set IP TOS if set */
   tport_set_tos(socket, ai, pri->pri_params->tpp_tos);
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
   /* Linux does not allow reusing TCP port while this one is open,
      so we can safely call su_setreuseaddr() before bind(). */
   su_setreuseaddr(socket, 1);
@@ -155,7 +155,7 @@ int tport_stream_init_primary(tport_primary_t *pri,
   if (listen(socket, pri->pri_params->tpp_qsize) == SOCKET_ERROR)
     return *return_culprit = "listen", -1;
 
-#if !defined(__linux__)
+#if !defined(__linux__) && !defined(__APPLE__)
   /* Allow reusing TCP sockets
    *
    * On Solaris & BSD, call setreuseaddr() after bind in order to avoid
@@ -187,6 +187,12 @@ int tport_tcp_init_secondary(tport_t *self, int socket, int accepted,
   int one = 1;
 
   self->tp_has_connection = 1;
+
+#if defined(__linux__) || defined(__APPLE__)
+  /* Linux does not allow reusing TCP port while this one is open,
+     so we can safely call su_setreuseaddr() before bind(). */
+  su_setreuseaddr(socket, 1);
+#endif
 
   if (setsockopt(socket, SOL_TCP, TCP_NODELAY, (void *)&one, sizeof one) == -1)
     return *return_reason = "TCP_NODELAY", -1;
@@ -270,6 +276,8 @@ int tport_recv_stream(tport_t *self)
     size_t i;
 
     n = su_recv(self->tp_socket, crlf, N, MSG_PEEK);
+    if (n <= 0)
+      return (int)n;
 
     i = ws_span(crlf, n);
     if (i == 0)
@@ -441,7 +449,7 @@ int tport_next_keepalive(tport_t *self,
 
 
 /** Keepalive timer. */
-void tport_keepalive_timer(tport_t *self, su_time_t now)
+static void tport_keepalive_timer(tport_t *self, su_time_t now)
 {
   unsigned timeout = self->tp_params->tpp_pingpong;
 
@@ -478,15 +486,7 @@ int tport_tcp_ping(tport_t *self, su_time_t now)
     return 0;
 
   n = send(self->tp_socket, "\r\n\r\n", 4, 0);
-
-  if (n > 0)
-    self->tp_ktime = now;
-
-  if (n == 4) {
-    if (self->tp_ptime.tv_sec == 0)
-      self->tp_ptime = now;
-  }
-  else if (n == -1) {
+  if (n == -1) {
     int error = su_errno();
 
     why = " failed";
@@ -499,11 +499,19 @@ int tport_tcp_ping(tport_t *self, su_time_t now)
     return -1;
   }
 
+  if (n > 0)
+    self->tp_ktime = now;
+
+  if (n == 4) {
+    if (self->tp_ptime.tv_sec == 0)
+      self->tp_ptime = now;
+  }
+
   SU_DEBUG_7(("%s(%p): %s to " TPN_FORMAT "%s\n",
 	      __func__, (void *)self,
 	      "sending PING", TPN_ARGS(self->tp_name), why));
 
-  return n == -1 ? -1 : 0;
+  return 0;
 }
 
 /** Send pong */

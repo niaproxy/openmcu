@@ -196,6 +196,9 @@
 /* Define to 1 if you have the `ssl' library (-lssl). */
 #undef HAVE_LIBSSL
 
+/* Define to 1 if dnssd library is available */
+#undef HAVE_MDNS
+
 /* Define to 1 if you have the `memccpy' function. */
 #undef HAVE_MEMCCPY
 
@@ -247,8 +250,23 @@
 /* Define to 1 if you have OpenSSL */
 #undef HAVE_OPENSSL
 
+/* Define to 1 if you have the <openssl/crypto.h> header file. */
+#undef HAVE_OPENSSL_CRYPTO_H
+
+/* Define to 1 if you have the <openssl/err.h> header file. */
+#undef HAVE_OPENSSL_ERR_H
+
+/* Define to 1 if you have the <openssl/pem.h> header file. */
+#undef HAVE_OPENSSL_PEM_H
+
+/* Define to 1 if you have the <openssl/ssl.h> header file. */
+#undef HAVE_OPENSSL_SSL_H
+
 /* Define to 1 if you have the <openssl/tls1.h> header file. */
 #undef HAVE_OPENSSL_TLS1_H
+
+/* Define to 1 if you have the <openssl/x509.h> header file. */
+#undef HAVE_OPENSSL_X509_H
 
 /* Define to 1 if you have the `poll' function. */
 #undef HAVE_POLL
@@ -419,8 +437,7 @@
 /* Format (%llx) for long long hex */
 #undef LLX
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #undef LT_OBJDIR
 
 /* Define printf() modifier for ssize_t */
@@ -428,9 +445,6 @@
 
 /* Define printf() modifier for size_t */
 #undef MOD_ZU
-
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
 
 /* Name of package */
 #undef PACKAGE

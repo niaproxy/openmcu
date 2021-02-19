@@ -189,8 +189,8 @@
 # Added auto inclusion of ptlib make rules
 #
 
-PWLIBDIR	= /usr/local/share/ptlib/
-OPENH323DIR	= /root/openmcu/h323plus
+PWLIBDIR	= /home/samohin-iv/openmcu/libs/ptlib
+OPENH323DIR	= /home/samohin-iv/openmcu/libs/h323plus
 STDCCFLAGS	+= 
 LDFLAGS		+= 
 LDLIBS		+= 

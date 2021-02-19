@@ -2522,7 +2522,7 @@ BOOL InteractiveHTTP::OnGET (PHTTPServer & server, const PURL &url, const PMIMEI
 
   PTRACE(5,"WebCtrl\tComm flow headers sent");
 
-  message="<html><body style='font-size:9px;font-family:Verdana,Arial;padding:0px;margin:1px;color:#000'><script>p=parent</script>\n";
+  message="<html><body style='font-family:Verdana,Arial;padding:0px;margin:1px;color:#000'><script>p=parent</script>\n";
   message << OpenMCU::Current().HttpStartEventReading(idx,room);
 
 //PTRACE(1,"!!!!!\tsha1('123')=" << PMessageDigestSHA1::Encode("123")); // sha1 works!! I'll try with websocket in future

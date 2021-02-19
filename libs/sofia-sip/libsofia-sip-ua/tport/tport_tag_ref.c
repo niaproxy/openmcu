@@ -76,6 +76,9 @@ EXPORT tag_typedef_t tptag_certificate_ref =
 extern tag_typedef_t tptag_compartment;
 EXPORT tag_typedef_t tptag_compartment_ref = 
   REFTAG_TYPEDEF(tptag_compartment);
+extern tag_typedef_t tptag_tls_ciphers;
+EXPORT tag_typedef_t tptag_tls_ciphers_ref = 
+  REFTAG_TYPEDEF(tptag_tls_ciphers);
 extern tag_typedef_t tptag_tls_version;
 EXPORT tag_typedef_t tptag_tls_version_ref = 
   REFTAG_TYPEDEF(tptag_tls_version);
@@ -133,3 +136,6 @@ EXPORT tag_typedef_t tptag_dump_ref =
 extern tag_typedef_t tptag_trusted;
 EXPORT tag_typedef_t tptag_trusted_ref = 
   REFTAG_TYPEDEF(tptag_trusted);
+extern tag_typedef_t tptag_dos;
+EXPORT tag_typedef_t tptag_dos_ref = 
+  REFTAG_TYPEDEF(tptag_dos);

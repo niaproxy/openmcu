@@ -1,6 +1,8 @@
 /* ---------------------------------------------------------------------- */
 /* S2 DNS server */
 
+#include "config.h"
+
 #include <sofia-sip/sresolv.h>
 #include <sofia-resolv/sres_record.h>
 #include <sofia-sip/url.h>
@@ -9,6 +11,8 @@
 
 #include <string.h>
 #include <stdlib.h>
+
+#undef NDEBUG
 #include <assert.h>
 
 extern uint16_t _sres_default_port; /* Ugly hack */
@@ -21,6 +25,8 @@ static struct s2dns {
   int (*filter)(void *data, size_t len, void *userdata);
   void *userdata;
 } s2dns;
+
+static char const *default_domain;
 
 static
 struct s2_dns_response {
@@ -82,6 +88,7 @@ void s2_dns_setup(su_root_t *root)
   /* su->su_port = htons(1053); */
 
   socket = su_socket(su->su_family, SOCK_DGRAM, 0);
+  assert(socket != -1);
 
   n = bind(socket, &su->su_sa, sulen); assert(n == 0);
   n = getsockname(socket, &su->su_sa, &sulen); assert(n == 0);
@@ -109,9 +116,20 @@ void
 s2_dns_teardown(void)
 {
   struct s2_dns_response *r, *next;
-  su_root_deregister(s2dns.root, s2dns.reg), s2dns.reg = -1;
+  int rv;
+
+  if (s2dns.root == NULL)
+    return;
+
+  default_domain = NULL;
+
+  assert(s2dns.reg > 0);
+  rv = su_root_deregister(s2dns.root, s2dns.reg), s2dns.reg = -1;
+  assert(rv != -1);
+  su_wait_destroy(s2dns.wait);
   su_close(s2dns.socket), s2dns.socket = -1;
-  s2dns.root = NULL;
+
+  memset(&s2dns, 0, sizeof s2dns);
 
   for (r = zonedata, zonedata = NULL; r; r = next) {
     next = r->next;
@@ -187,8 +205,6 @@ s2_dns_query(su_root_magic_t *magic,
     su_sendto(socket, request.buffer, len, 0, &su->su_sa, sulen);
   return 0;
 }
-
-static char const *default_domain;
 
 /** Set default domain suffix used with s2_dns_record() */
 char const *
@@ -566,7 +582,7 @@ void s2_dns_domain(char const *domain, int use_naptr,
 
 /** Insert DNS response.
 
-  s2_dns_record("example.com", sres_type_naptr,
+  s2_dns_record("example.com.", sres_type_naptr,
 		// order priority flags services regexp target
 		"", sres_type_naptr, 20, 50, "a", "SIP+D2U", "", "sip00",
 		"", sres_type_naptr, 20, 50, "a", "SIP+D2T", "", "sip00",

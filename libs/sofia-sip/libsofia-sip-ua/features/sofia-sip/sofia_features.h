@@ -39,9 +39,9 @@
 #define SOFIA_SIP_FEATURES_H
 
 /** Current Sofia version. @showinitializer */
-#define SOFIA_SIP_VERSION  "1.12.11"
+#define SOFIA_SIP_VERSION  "1.13.25bc"
 /** Current Sofia package name and version. @showinitializer */
-#define SOFIA_SIP_NAME_VERSION   "sofia-sip-1.12.11"
+#define SOFIA_SIP_NAME_VERSION   "sofia-sip-1.13.25bc"
 
 #ifdef __cplusplus
 extern "C" {

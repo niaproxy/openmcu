@@ -180,6 +180,12 @@ TPORT_DLL extern tag_typedef_t tptag_certificate;
 TPORT_DLL extern tag_typedef_t tptag_certificate_ref;
 #define TPTAG_CERTIFICATE_REF(x) tptag_certificate_ref, tag_str_vr(&(x))
 
+TPORT_DLL extern tag_typedef_t tptag_tls_ciphers;
+#define TPTAG_TLS_CIPHERS(x) tptag_tls_ciphers, tag_str_v((x))
+
+TPORT_DLL extern tag_typedef_t tptag_tls_ciphers_ref;
+#define TPTAG_TLS_CIPHERS_REF(x) tptag_tls_ciphers_ref, tag_str_vr(&(x))
+
 TPORT_DLL extern tag_typedef_t tptag_tls_version;
 #define TPTAG_TLS_VERSION(x) tptag_tls_version, tag_uint_v((x))
 
@@ -306,6 +312,12 @@ TPORT_DLL extern tag_typedef_t tptag_dump;
 
 TPORT_DLL extern tag_typedef_t tptag_dump_ref;
 #define TPTAG_DUMP_REF(x) tptag_dump_ref, tag_str_vr(&(x))
+
+TPORT_DLL extern tag_typedef_t tptag_dos;
+#define TPTAG_DOS(x) tptag_dos, tag_int_v((x))
+
+TPORT_DLL extern tag_typedef_t tptag_dos_ref;
+#define TPTAG_DOS_REF(x) tptag_dos_ref, tag_int_vr(&(x))
 
 SOFIA_END_DECLS
 

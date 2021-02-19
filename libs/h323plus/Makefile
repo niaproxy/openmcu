@@ -285,7 +285,7 @@
 PREFIX=/usr/local
 exec_prefix = $(PREFIX)
 LIBDIR=${exec_prefix}/lib
-export OPENH323DIR=/root/openmcu/h323plus
+export OPENH323DIR=/home/samohin-iv/openmcu/libs/h323plus
 
 INSTALL=/usr/bin/install -c
 

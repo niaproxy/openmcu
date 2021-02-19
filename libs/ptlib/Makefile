@@ -213,7 +213,7 @@
 PREFIX=/usr/local
 exec_prefix = ${PREFIX}
 LIBDIR=${exec_prefix}/lib
-export PTLIBDIR=/opt/git/test/ptlib
+export PTLIBDIR=/home/samohin-iv/openmcu/libs/ptlib
 
 INSTALL=/usr/bin/install -c
 

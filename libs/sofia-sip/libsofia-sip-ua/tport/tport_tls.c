@@ -49,6 +49,8 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
+#include <openssl/pkcs12.h>
+
 #include <openssl/rand.h>
 #include <openssl/bio.h>
 #include <openssl/opensslv.h>
@@ -128,6 +130,7 @@ struct tls_s {
 
   /* Host names */
   su_strlst_t *subjects;
+  unsigned char sha1_fingerprint[20];
 };
 
 enum { tls_buffer_size = 16384 };
@@ -201,7 +204,7 @@ void tls_set_default(tls_issues_t *i)
   i->cert = i->cert ? i->cert : "agent.pem";
   i->key = i->key ? i->key : i->cert;
   i->randFile = i->randFile ? i->randFile : "tls_seed.dat";
-  i->cipher = i->cipher ? i->cipher : "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH";
+  i->ciphers = i->ciphers ? i->ciphers : "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH";
   /* Default SIP cipher */
   /* "RSA-WITH-AES-128-CBC-SHA"; */
   /* RFC-2543-compatibility ciphersuite */
@@ -291,17 +294,13 @@ int tls_init_context(tls_t *tls, tls_issues_t const *ti)
 #endif
 
   if (tls->ctx == NULL) {
-    const SSL_METHOD *meth;
-
-    /* meth = SSLv3_method(); */
-    /* meth = SSLv23_method(); */
-
-    if (ti->version)
-      meth = TLSv1_method();
-    else
-      meth = SSLv23_method();
-
-    tls->ctx = SSL_CTX_new((SSL_METHOD*)meth);
+    /* Create a TLS context supported all versions of the
+     * protocol excepted SSLv2 and SSLv3. Despite its
+     * confusing name, SSLv23_method() means using
+     * all versions of TLS protocol.
+     */
+    tls->ctx = SSL_CTX_new(SSLv23_method());
+    SSL_CTX_set_options(tls->ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
   }
 
   if (tls->ctx == NULL) {
@@ -316,32 +315,198 @@ int tls_init_context(tls_t *tls, tls_issues_t const *ti)
     SSL_CTX_set_default_passwd_cb_userdata(tls->ctx, (void *)ti);
   }
 
-  if (!SSL_CTX_use_certificate_file(tls->ctx,
-				    ti->cert,
-				    SSL_FILETYPE_PEM)) {
-    if (ti->configured > 0) {
-      SU_DEBUG_1(("%s: invalid local certificate: %s\n",
-		 "tls_init_context", ti->cert));
-      tls_log_errors(3, "tls_init_context", 0);
-#if require_client_certificate
-      errno = EIO;
-      return -1;
-#endif
-    }
-  }
+  if(ti->keystore) {
+    SU_DEBUG_1(("%s: Using : %s\n", "tls_init_context", ti->keystore));
+	  FILE *fp;
+	  EVP_PKEY *pkey = NULL;
+	  X509 *cert = NULL;
+	  X509 *x;
+	  STACK_OF(X509) *ca = NULL;
+	  PKCS12 *p12 = NULL;
+	  OpenSSL_add_all_algorithms();
+	  ERR_load_crypto_strings();
+	  fp = fopen(ti->keystore, "rb");
 
-  if (!SSL_CTX_use_PrivateKey_file(tls->ctx,
-                                   ti->key,
-                                   SSL_FILETYPE_PEM)) {
-    if (ti->configured > 0) {
-      SU_DEBUG_1(("%s: invalid private key: %s\n",
-		 "tls_init_context", ti->key));
-      tls_log_errors(3, "tls_init_context(key)", 0);
+	  X509_STORE *store = NULL;
+
+	  if (fp == NULL) {
+		  SU_DEBUG_1(("%s: Error opening file : %s\n", "tls_init_context", ti->keystore));
 #if require_client_certificate
-      errno = EIO;
-      return -1;
+		  errno = EIO;
 #endif
-    }
+		  return -1;
+	  }
+	  p12 = d2i_PKCS12_fp(fp, NULL);
+	  fclose (fp);
+	  if (!p12) {
+		  SU_DEBUG_1(("%s: Error reading PKCS#12 file : %s\n", "tls_init_context", ti->keystore));
+#if require_client_certificate
+		  errno = EIO;
+#endif
+		  return -1;
+	  }
+	  if (!PKCS12_parse(p12, ti->passphrase ? ti->passphrase : "", &pkey, &cert, &ca)) {
+		  SU_DEBUG_1(("%s: Error parsing PKCS#12 file : %s\n", "tls_init_context", ti->keystore));
+#if require_client_certificate
+		  errno = EIO;
+#endif
+		  return -1;
+	  }
+	  if (!SSL_CTX_use_certificate(tls->ctx, cert)) {
+		  if (ti->configured > 0) {
+			 SU_DEBUG_1(("%s: invalid local certificate.\n",
+						  "tls_init_context"));
+			 tls_log_errors(3, "tls_init_context", 0);
+#if require_client_certificate
+			 errno = EIO;
+#endif
+			 if (p12)
+				 PKCS12_free(p12);
+			 if (ca)
+				 sk_X509_pop_free(ca, X509_free);
+			 if (cert)
+				 X509_free(cert);
+			 if (pkey)
+				 EVP_PKEY_free(pkey);
+
+			 return -1;
+		  }
+	  }
+	  if (!SSL_CTX_use_PrivateKey(tls->ctx,pkey)) {
+		  if (ti->configured > 0) {
+			  SU_DEBUG_1(("%s: invalid private key\n",
+						  "tls_init_context"));
+			  tls_log_errors(3, "tls_init_context(key)", 0);
+#if require_client_certificate
+			  errno = EIO;
+#endif
+			  if (p12)
+				  PKCS12_free(p12);
+			  if (ca)
+				  sk_X509_pop_free(ca, X509_free);
+			  if (cert)
+				  X509_free(cert);
+			  if (pkey)
+				  EVP_PKEY_free(pkey);
+
+			  return -1;
+		  }
+	  }
+	  if (ca) {
+		  store = X509_STORE_new();
+		  if (!store) {
+#if require_client_certificate
+			  errno = EIO;
+#endif
+			  if (p12)
+				  PKCS12_free(p12);
+			  if (ca)
+				  sk_X509_pop_free(ca, X509_free);
+			  if (cert)
+				  X509_free(cert);
+			  if (pkey)
+				  EVP_PKEY_free(pkey);
+
+			  return -1;
+		  }
+
+		  while (sk_X509_num(ca)) {
+			  x = sk_X509_pop(ca);
+			  if (!SSL_CTX_add_client_CA(tls->ctx, x)) {
+				  X509_free(x);
+#if require_client_certificate
+				  errno = EIO;
+#endif
+				  if (p12)
+					  PKCS12_free(p12);
+				  if (ca)
+					  sk_X509_pop_free(ca, X509_free);
+				  if (cert)
+					  X509_free(cert);
+				  if (pkey)
+					  EVP_PKEY_free(pkey);
+
+				  return -1;
+			  }
+			  if (!SSL_CTX_add_extra_chain_cert(tls->ctx, x)) {
+				  X509_free(x);
+#if require_client_certificate
+				  errno = EIO;
+#endif
+				  if (p12)
+					  PKCS12_free(p12);
+				  if (ca)
+					  sk_X509_pop_free(ca, X509_free);
+				  if (cert)
+					  X509_free(cert);
+				  if (pkey)
+					  EVP_PKEY_free(pkey);
+
+				  return -1;
+			  }
+			  if (!X509_STORE_add_cert(store, x)) {
+				  X509_free(x);
+#if require_client_certificate
+				  errno = EIO;
+#endif
+				  if (p12)
+					  PKCS12_free(p12);
+				  if (ca)
+					  sk_X509_pop_free(ca, X509_free);
+				  if (cert)
+					  X509_free(cert);
+				  if (pkey)
+					  EVP_PKEY_free(pkey);
+
+				  return -1;
+			  }
+		  }
+
+		  /* If another X509_STORE object is currently set in ctx,
+		   * it will be automatically freed
+		   */
+		  SSL_CTX_set_cert_store(tls->ctx, store);
+
+		  SU_DEBUG_1(("%s: Adding ca list\n",
+		  "tls_init_context"));
+		  //SSL_CTX_set_client_CA_list(tls->ctx, ca);
+	  }
+	  if (p12)
+		  PKCS12_free(p12);
+	  if (ca)
+		  sk_X509_pop_free(ca, X509_free);
+	  if (cert)
+		  X509_free(cert);
+	  if (pkey)
+		  EVP_PKEY_free(pkey);
+  } else {
+	  if (!SSL_CTX_use_certificate_file(tls->ctx,
+										ti->cert,
+										SSL_FILETYPE_PEM)) {
+    if (ti->configured > 0) {
+		SU_DEBUG_1(("%s: invalid local certificate: %s\n",
+					"tls_init_context", ti->cert));
+		tls_log_errors(3, "tls_init_context", 0);
+#if require_client_certificate
+		errno = EIO;
+		return -1;
+#endif
+		}
+	}
+
+	  if (!SSL_CTX_use_PrivateKey_file(tls->ctx,
+									   ti->key,
+									   SSL_FILETYPE_PEM)) {
+		if (ti->configured > 0) {
+		SU_DEBUG_1(("%s: invalid private key: %s\n",
+					"tls_init_context", ti->key));
+		tls_log_errors(3, "tls_init_context(key)", 0);
+#if require_client_certificate
+		errno = EIO;
+		return -1;
+#endif
+		}
+	}
   }
 
   if (!SSL_CTX_check_private_key(tls->ctx)) {
@@ -355,11 +520,19 @@ int tls_init_context(tls_t *tls, tls_issues_t const *ti)
 #endif
   }
 
-  if (!SSL_CTX_load_verify_locations(tls->ctx,
-                                     ti->CAfile,
-                                     ti->CApath)) {
+  if (ti->CAfile == NULL && ti->CApath == NULL) {
+    /* No CAfile, default path */
+    if (!SSL_CTX_set_default_verify_paths(tls->ctx)) {
+      SU_DEBUG_1(("tls_init_context: error setting default verify paths\n"));
+      errno = EIO;
+      return -1;
+    }
+  }
+  else if (!SSL_CTX_load_verify_locations(tls->ctx,
+					  ti->CAfile,
+					  ti->CApath)) {
     SU_DEBUG_1(("%s: error loading CA list: %s\n",
-		 "tls_init_context", ti->CAfile));
+		"tls_init_context", ti->CAfile ? ti->CAfile : "<default>"));
     if (ti->configured > 0)
       tls_log_errors(3, "tls_init_context(CA)", 0);
     errno = EIO;
@@ -381,7 +554,7 @@ int tls_init_context(tls_t *tls, tls_issues_t const *ti)
   SSL_CTX_set_verify_depth(tls->ctx, ti->verify_depth);
   SSL_CTX_set_verify(tls->ctx, verify, tls_verify_cb);
 
-  if (!SSL_CTX_set_cipher_list(tls->ctx, ti->cipher)) {
+  if (!SSL_CTX_set_cipher_list(tls->ctx, ti->ciphers)) {
     SU_DEBUG_1(("%s: error setting cipher list\n", "tls_init_context"));
     tls_log_errors(3, "tls_init_context", 0);
     errno = EIO;
@@ -396,27 +569,18 @@ void tls_free(tls_t *tls)
   if (!tls)
     return;
 
-  if (tls->con != NULL)
+  if (tls->con != NULL) {
     SSL_shutdown(tls->con);
+    SSL_shutdown(tls->con);
+    SSL_free(tls->con);
+  }
 
   if (tls->ctx != NULL && tls->type != tls_slave)
     SSL_CTX_free(tls->ctx);
 
-  if (tls->bio_con != NULL)
-    BIO_free(tls->bio_con);
-
   su_home_unref(tls->home);
 }
 
-int tls_get_socket(tls_t *tls)
-{
-  int sock = -1;
-
-  if (tls != NULL && tls->bio_con != NULL)
-    BIO_get_fd(tls->bio_con, &sock);
-
-  return sock;
-}
 
 tls_t *tls_init_master(tls_issues_t *ti)
 {
@@ -472,7 +636,6 @@ tls_t *tls_init_secondary(tls_t *master, int sock, int accept)
 
   if (tls) {
     tls->ctx = master->ctx;
-    tls->type = master->type;
     tls->accept = accept ? 1 : 0;
     tls->verify_outgoing = master->verify_outgoing;
     tls->verify_incoming = master->verify_incoming;
@@ -512,6 +675,7 @@ su_inline
 int tls_post_connection_check(tport_t *self, tls_t *tls)
 {
   X509 *cert;
+  const EVP_MD *digest;
   int extcount;
   int i, j, error;
 
@@ -519,19 +683,22 @@ int tls_post_connection_check(tport_t *self, tls_t *tls)
 
   cert = SSL_get_peer_certificate(tls->con);
   if (!cert) {
-    SU_DEBUG_7(("%s(%p): Peer did not provide X.509 Certificate.\n", 
+    SU_DEBUG_7(("%s(%p): Peer did not provide X.509 Certificate.\n",
 		 __func__, (void *) self));
     if (self->tp_accepted && tls->verify_incoming)
       return X509_V_ERR_CERT_UNTRUSTED;
     else if (!self->tp_accepted && tls->verify_outgoing)
       return X509_V_ERR_CERT_UNTRUSTED;
-    else 
+    else
       return X509_V_OK;
   }
 
   tls->subjects = su_strlst_create(tls->home);
   if (!tls->subjects)
     return X509_V_ERR_OUT_OF_MEM;
+
+  digest = EVP_get_digestbyname("sha1");
+  X509_digest(cert, digest, tls->sha1_fingerprint, NULL);
 
   extcount = X509_get_ext_count(cert);
 
@@ -718,7 +885,7 @@ ssize_t tls_read(tls_t *tls)
     return (ssize_t)tls->read_buffer_len;
 
   tls->read_events = SU_WAIT_IN;
-
+  ERR_clear_error();
   ret = SSL_read(tls->con, tls->read_buffer, tls_buffer_size);
   if (ret <= 0)
     return tls_error(tls, ret, "tls_read: SSL_read", NULL, 0);
@@ -802,7 +969,7 @@ ssize_t tls_write(tls_t *tls, void *buf, size_t size)
     return 0;
 
   tls->write_events = 0;
-
+  ERR_clear_error();
   ret = SSL_write(tls->con, buf, size);
   if (ret < 0)
     return tls_error(tls, ret, "tls_write: SSL_write", buf, size);
@@ -895,6 +1062,7 @@ int tls_connect(su_root_magic_t *magic, su_wait_t *w, tport_t *self)
   if (self->tp_is_connected == 0) {
     int ret, status;
 
+    ERR_clear_error();
     ret = self->tp_accepted ? SSL_accept(tls->con) : SSL_connect(tls->con);
     status = SSL_get_error(tls->con, ret);
 
@@ -935,8 +1103,9 @@ int tls_connect(su_root_magic_t *magic, su_wait_t *w, tport_t *self)
           tls->read_events = SU_WAIT_IN;
           tls->write_events = 0;
           self->tp_is_connected = 1;
-	  self->tp_verified = tls->x509_verified;
-	  self->tp_subjects = tls->subjects;
+          self->tp_verified = tls->x509_verified;
+          self->tp_subjects = tls->subjects;
+          memcpy(self->tp_sha1_fingerprint, tls->sha1_fingerprint, sizeof(self->tp_sha1_fingerprint));
 
 	  if (tport_has_queued(self))
             tport_send_event(self);

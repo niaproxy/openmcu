@@ -50,6 +50,9 @@ EXPORT tag_typedef_t soatag_user_sdp_ref =
 extern tag_typedef_t soatag_user_sdp_str;
 EXPORT tag_typedef_t soatag_user_sdp_str_ref = 
   REFTAG_TYPEDEF(soatag_user_sdp_str);
+extern tag_typedef_t soatag_user_o_line;
+EXPORT tag_typedef_t soatag_user_o_line_ref = 
+  REFTAG_TYPEDEF(soatag_user_o_line);
 extern tag_typedef_t soatag_af;
 EXPORT tag_typedef_t soatag_af_ref = 
   REFTAG_TYPEDEF(soatag_af);
@@ -126,6 +129,7 @@ EXPORT tag_type_t soa_tag_list[] =
   soatag_audio_aux,
   soatag_srtp_enable,
   soatag_active_video,
+  soatag_user_o_line,
   soatag_af,
   soatag_user_sdp,
   soatag_local_sdp_str,

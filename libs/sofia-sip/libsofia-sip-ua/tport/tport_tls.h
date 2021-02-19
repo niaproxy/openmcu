@@ -60,11 +60,12 @@ typedef struct tls_issues_s {
   char *randFile;       /* Seed file for the PRNG (default: tls_seed.dat) */
   char *CAfile;		/* PEM file of CA's                           */
   char *CApath;		/* PEM file path of CA's		      */
-  char *cipher;         /* Should be one of the above defined ciphers *
+  char *ciphers;         /* Should be one of the above defined ciphers *
 			 * or NULL (default: "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH
                          */
   int   version;	/* For tls1, version is 1. When ssl3/ssl2 is
 			 * used, it is 0. */
+  char *keystore;		/* Path a p12 key store file         */
 } tls_issues_t;
 
 typedef struct tport_tls_s {
@@ -81,7 +82,6 @@ typedef struct tport_tls_primary_s {
 tls_t *tls_init_master(tls_issues_t *tls_issues);
 tls_t *tls_init_secondary(tls_t *tls_master, int sock, int accept);
 void tls_free(tls_t *tls);
-int tls_get_socket(tls_t *tls);
 ssize_t tls_read(tls_t *tls);
 void *tls_read_buffer(tls_t *tls, size_t N);
 int tls_want_read(tls_t *tls, int events);

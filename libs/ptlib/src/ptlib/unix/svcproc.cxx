@@ -377,8 +377,8 @@ void PSystemLog::Output(Level level, const char * cmsg)
     ostream * out;
     if (systemLogFileName == "-")
       out = &cerr;
-    else
-      out = new ofstream(systemLogFileName, ios::app);
+    //else
+     // out = new ofstream(systemLogFileName, ios::app);
 
     PTime now;
     *out << now.AsString("yyyy/MM/dd hh:mm:ss.uuu\t");
@@ -1028,4 +1028,5 @@ void PServiceProcess::PXOnSignal(int sig)
 #endif
   }
 }
+
 

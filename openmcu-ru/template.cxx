@@ -281,10 +281,10 @@ void Conference::LoadTemplate(PString tpl)
             if(hasGainOptions)
             { // stay compatible with temp. style templates:
               member->SetChannelState(maskAndGain[0].AsInteger());
-//              member->kManualGainDB = maskAndGain[1].AsInteger()-20;
-//              member->kOutputGainDB = maskAndGain[2].AsInteger()-20;
-//              member->kManualGain=(float)pow(10.0,((float)member->kManualGainDB)/20.0);
-//              member->kOutputGain=(float)pow(10.0,((float)member->kOutputGainDB)/20.0);
+              member->kManualGainDB = maskAndGain[1].AsInteger()-20;
+              member->kOutputGainDB = maskAndGain[2].AsInteger()-20;
+              member->kManualGain=(float)pow(10.0,((float)member->kManualGainDB)/20.0);
+              member->kOutputGain=(float)pow(10.0,((float)member->kOutputGainDB)/20.0);
             }
             else 
             {

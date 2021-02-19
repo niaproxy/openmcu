@@ -259,6 +259,12 @@ tag_typedef_t tptag_sigcomp_lifetime = UINTTAG_TYPEDEF(sigcomp_lifetime);
  *
  * Use with tport_tbind(), nua_create(), nta_agent_create(),
  * nta_agent_add_tport(), nth_engine_create(), or initial nth_site_create().
+ *
+ * If NULL or not used, verify path "$HOME/.sip/auth" is used.
+ *
+ * @note
+ * The system default verify path is used with value ":" or "" from
+ * release @VERSION_UNRELEASED onwards.
  */
 tag_typedef_t tptag_certificate = STRTAG_TYPEDEF(certificate);
 
@@ -270,6 +276,14 @@ tag_typedef_t tptag_certificate = STRTAG_TYPEDEF(certificate);
  */
 tag_typedef_t tptag_compartment = PTRTAG_TYPEDEF(compartment);
 
+/**@def TPTAG_TLS_CIPHERS(x)
+ *
+ * Sets the supported TLS cipher suites.
+ *
+ * Use with tport_tbind(), nua_create(), nta_agent_create(),
+ * nta_agent_add_tport(), nth_engine_create(), or initial nth_site_create().
+ */
+tag_typedef_t tptag_tls_ciphers = STRTAG_TYPEDEF(tls_ciphers);
 
 /**@def TPTAG_TLS_VERSION(x)
  *
@@ -302,25 +316,25 @@ tag_typedef_t tptag_tls_passphrase = STRTAG_TYPEDEF(tls_passphrase);
  *
  * The verification of certificates can be controlled:
  * @par Values:
- *    - #TPTLS_VERIFY_NONE: 
+ *    - #TPTLS_VERIFY_NONE:
  *          Do not verify Peer Certificates.
- *    - #TPTLS_VERIFY_IN: 
- *          Drop incoming connections which fail signature verification 
- *          against trusted certificate authorities. Peers must provide a 
+ *    - #TPTLS_VERIFY_IN:
+ *          Drop incoming connections which fail signature verification
+ *          against trusted certificate authorities. Peers must provide a
  *          certificate during the initial TLS Handshake.
- *    - #TPTLS_VERIFY_OUT: 
- *          Drop outgoing connections which fail signature verification 
+ *    - #TPTLS_VERIFY_OUT:
+ *          Drop outgoing connections which fail signature verification
  *          against trusted certificate authorities.
- *    - #TPTLS_VERIFY_ALL: 
+ *    - #TPTLS_VERIFY_ALL:
  *          Alias for (TPTLS_VERIFY_IN|TPTLS_VERIFY_OUT)
- *    - #TPTLS_VERIFY_SUBJECTS_IN: 
- *          Match the certificate subject on incoming connections against 
- *          a provided list.  If no match is found, the connection is 
+ *    - #TPTLS_VERIFY_SUBJECTS_IN:
+ *          Match the certificate subject on incoming connections against
+ *          a provided list.  If no match is found, the connection is
  *          rejected. If no list is provided, subject checking is bypassed.
  *          Note: Implies #TPTLS_VERIFY_IN.
- *    - #TPTLS_VERIFY_SUBJECTS_OUT: 
- *          Match the certificate subject on outgoing connections against 
- *          a provided list.  If no match is found, the connection is 
+ *    - #TPTLS_VERIFY_SUBJECTS_OUT:
+ *          Match the certificate subject on outgoing connections against
+ *          a provided list.  If no match is found, the connection is
  *          rejected.
  *          Note: Implies #TPTLS_VERIFY_OUT.
  *    - #TPTLS_VERIFY_SUBJECTS_ALL:
@@ -338,12 +352,12 @@ tag_typedef_t tptag_tls_verify_policy = UINTTAG_TYPEDEF(tls_verify_policy);
 /**@def TPTAG_TLS_VERIFY_DEPTH(x)
  *
  * Define the maximum length of a valid certificate chain.
- * 
+ *
  * @par Default
  *   2
  *
  * @par Used with
- *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(), 
+ *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(),
  *   nth_engine_create(), or initial nth_site_create().
  *
  * @par Parameter Type:
@@ -366,7 +380,7 @@ tag_typedef_t tptag_tls_verify_depth = UINTTAG_TYPEDEF(tls_verify_depth);
  *   - Non-Zero - Enable date verification.
  *
  * @par Used with
- *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(), 
+ *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(),
  *   nth_engine_create(), or initial nth_site_create().
  *
  * @par Parameter Type:
@@ -387,7 +401,7 @@ tag_typedef_t tptag_tls_verify_date = UINTTAG_TYPEDEF(tls_verify_date);
  * the connection is automatically rejected.
  *
  * @par Used with
- *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(), 
+ *   tport_tbind(), nua_create(), nta_agent_create(), nta_agent_add_tport(),
  *   nth_engine_create(), initial nth_site_create(),
  *   TPTLS_VERIFY_SUBJECTS_IN
  *
@@ -407,7 +421,7 @@ tag_typedef_t tptag_tls_verify_subjects = PTRTAG_TYPEDEF(tls_verify_subjects);
 /**@def TPTAG_X509_SUBJECT(x)
  *
  * Requires that a message be sent over a TLS transport with trusted X.509
- * certificate.  The character string provided must match against a subject 
+ * certificate.  The character string provided must match against a subject
  * from the trusted certificate.
  *
  * @par Used with
@@ -573,3 +587,11 @@ tag_typedef_t tptag_dump = STRTAG_TYPEDEF(dump);
  * initial nth_site_create().
  */
 tag_typedef_t tptag_trusted = BOOLTAG_TYPEDEF(trusted);
+
+/**@def TPTAG_DOS(x)
+ * 
+ * Sets the time period used to calculate the packet count rate
+ * 
+ * Use with tport_tcreate() or tport_set_params().
+ */
+tag_typedef_t tptag_dos = INTTAG_TYPEDEF(dos);

@@ -53,6 +53,9 @@ EXPORT tag_typedef_t nutag_include_extra_sdp_ref =
 extern tag_typedef_t nutag_media_enable;
 EXPORT tag_typedef_t nutag_media_enable_ref = 
   REFTAG_TYPEDEF(nutag_media_enable);
+extern tag_typedef_t nutag_accept_multipart;
+EXPORT tag_typedef_t nutag_accept_multipart_ref = 
+  REFTAG_TYPEDEF(nutag_accept_multipart);
 extern tag_typedef_t nutag_soa_name;
 EXPORT tag_typedef_t nutag_soa_name_ref = 
   REFTAG_TYPEDEF(nutag_soa_name);
@@ -134,6 +137,12 @@ EXPORT tag_typedef_t nutag_auto302_ref =
 extern tag_typedef_t nutag_auto305;
 EXPORT tag_typedef_t nutag_auto305_ref = 
   REFTAG_TYPEDEF(nutag_auto305);
+extern tag_typedef_t nutag_auto100;
+EXPORT tag_typedef_t nutag_auto100_ref = 
+  REFTAG_TYPEDEF(nutag_auto100);
+extern tag_typedef_t nutag_max_retry_after;
+EXPORT tag_typedef_t nutag_max_retry_after_ref = 
+  REFTAG_TYPEDEF(nutag_max_retry_after);
 extern tag_typedef_t nutag_smime_enable;
 EXPORT tag_typedef_t nutag_smime_enable_ref = 
   REFTAG_TYPEDEF(nutag_smime_enable);
@@ -251,6 +260,9 @@ EXPORT tag_typedef_t nutag_allow_ref =
 extern tag_typedef_t nutag_allow_events;
 EXPORT tag_typedef_t nutag_allow_events_ref = 
   REFTAG_TYPEDEF(nutag_allow_events);
+extern tag_typedef_t nutag_appl_event;
+EXPORT tag_typedef_t nutag_appl_event_ref = 
+  REFTAG_TYPEDEF(nutag_appl_event);
 extern tag_typedef_t nutag_appl_method;
 EXPORT tag_typedef_t nutag_appl_method_ref = 
   REFTAG_TYPEDEF(nutag_appl_method);
@@ -278,6 +290,9 @@ EXPORT tag_typedef_t nutag_dialog_ref =
 extern tag_typedef_t nutag_shutdown_events;
 EXPORT tag_typedef_t nutag_shutdown_events_ref = 
   REFTAG_TYPEDEF(nutag_shutdown_events);
+extern tag_typedef_t nutag_deferrable_timers;
+EXPORT tag_typedef_t nutag_deferrable_timers_ref = 
+  REFTAG_TYPEDEF(nutag_deferrable_timers);
 extern tag_typedef_t nutag_soa_session;
 EXPORT tag_typedef_t nutag_soa_session_ref = 
   REFTAG_TYPEDEF(nutag_soa_session);
@@ -293,6 +308,7 @@ EXPORT tag_type_t nua_tag_list[] =
   nutag_retry_count,
   nutag_uicc,
   nutag_smime_opt,
+  nutag_appl_event,
   nutag_sips_url,
   nutag_soa_session,
   nutag_keepalive_stream,
@@ -326,6 +342,7 @@ EXPORT tag_type_t nua_tag_list[] =
   nutag_outbound_set3,
   nutag_phrase,
   nutag_outbound_set4,
+  nutag_max_retry_after,
   nutag_detect_network_updates,
   nutag_offer_recv,
   nutag_auto302,
@@ -341,6 +358,7 @@ EXPORT tag_type_t nua_tag_list[] =
   nutag_update_refresh,
   nutag_dialog,
   nutag_substate,
+  nutag_accept_multipart,
   nutag_m_display,
   nutag_address,
   nutag_refer_with_id,
@@ -356,6 +374,7 @@ EXPORT tag_type_t nua_tag_list[] =
   nutag_m_params,
   nutag_status,
   nutag_refer_pause,
+  nutag_deferrable_timers,
   nutag_appl_method,
   nutag_allow,
   nutag_handle,
@@ -375,6 +394,7 @@ EXPORT tag_type_t nua_tag_list[] =
   nutag_callstate,
   nutag_autoack,
   nutag_offer_sent,
+  nutag_auto100,
   nutag_refresh_without_sdp,
   nutag_sub_expires,
   nutag_autoalert,

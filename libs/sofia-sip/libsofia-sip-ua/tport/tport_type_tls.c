@@ -43,6 +43,9 @@
 
 #include "tport_internal.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <time.h>
 #include <assert.h>
@@ -96,6 +99,12 @@ static int tport_tls_accept(tport_primary_t *pri, int events);
 static tport_t *tport_tls_connect(tport_primary_t *pri, su_addrinfo_t *ai,
                                   tp_name_t const *tpn);
 
+static int tport_tls_ping(tport_t *self, su_time_t now);
+static void tport_tls_timer(tport_t *self, su_time_t now);
+static int tport_tls_next_timer(tport_t *self,
+			 su_time_t *return_target,
+			 char const **return_why);
+
 tport_vtable_t const tport_tls_vtable =
 {
   /* vtp_name 		     */ "tls",
@@ -117,8 +126,8 @@ tport_vtable_t const tport_tls_vtable =
   /* vtp_prepare             */ NULL,
   /* vtp_keepalive           */ NULL,
   /* vtp_stun_response       */ NULL,
-  /* vtp_next_secondary_timer*/ NULL,
-  /* vtp_secondary_timer     */ NULL,
+  /* vtp_next_secondary_timer*/ tport_tls_next_timer,
+  /* vtp_secondary_timer     */ tport_tls_timer,
 };
 
 tport_vtable_t const tport_tls_client_vtable =
@@ -142,8 +151,8 @@ tport_vtable_t const tport_tls_client_vtable =
   /* vtp_prepare             */ NULL,
   /* vtp_keepalive           */ NULL,
   /* vtp_stun_response       */ NULL,
-  /* vtp_next_secondary_timer*/ NULL,
-  /* vtp_secondary_timer     */ NULL,
+  /* vtp_next_secondary_timer*/ tport_tls_next_timer,
+  /* vtp_secondary_timer     */ tport_tls_timer,
 };
 
 static int tport_tls_init_primary(tport_primary_t *pri,
@@ -180,6 +189,7 @@ static int tport_tls_init_master(tport_primary_t *pri,
   char *homedir;
   char *tbf = NULL;
   char const *path = NULL;
+  char const *tls_ciphers = NULL;
   unsigned tls_version = 1;
   unsigned tls_verify = 0;
   char const *passphrase = NULL;
@@ -197,6 +207,7 @@ static int tport_tls_init_master(tport_primary_t *pri,
 
   tl_gets(tags,
 	  TPTAG_CERTIFICATE_REF(path),
+	  TPTAG_TLS_CIPHERS_REF(tls_ciphers),
 	  TPTAG_TLS_VERSION_REF(tls_version),
 	  TPTAG_TLS_VERIFY_PEER_REF(tls_verify),
 	  TPTAG_TLS_PASSPHRASE_REF(passphrase),
@@ -206,7 +217,17 @@ static int tport_tls_init_master(tport_primary_t *pri,
 	  TPTAG_TLS_VERIFY_SUBJECTS_REF(tls_subjects),
 	  TAG_END());
 
-  if (!path) {
+  if (path) {
+    if (su_strmatch(path, ":") || su_strmatch(path, "")) {
+      path = NULL;
+
+      ti.policy = tls_policy | (tls_verify ? TPTLS_VERIFY_ALL : 0);
+      ti.verify_depth = tls_depth;
+      ti.verify_date = tls_date;
+      ti.version = tls_version;
+      tlspri->tlspri_master = tls_init_master(&ti);
+    }
+  } else {
     homedir = getenv("HOME");
     if (!homedir)
       homedir = "";
@@ -214,17 +235,28 @@ static int tport_tls_init_master(tport_primary_t *pri,
   }
 
   if (path) {
-    ti.policy = tls_policy | (tls_verify ? TPTLS_VERIFY_ALL : 0);
-    ti.verify_depth = tls_depth;
-    ti.verify_date = tls_date;
-    ti.configured = path != tbf;
-    ti.randFile = su_sprintf(autohome, "%s/%s", path, "tls_seed.dat");
-    ti.key = su_sprintf(autohome, "%s/%s", path, "agent.pem");
-    ti.passphrase = su_strdup(autohome, passphrase);
-    ti.cert = ti.key;
-    ti.CAfile = su_sprintf(autohome, "%s/%s", path, "cafile.pem");
-    ti.version = tls_version;
-    ti.CApath = su_strdup(autohome, path);
+	struct stat statbuf;
+	int reg = 0;
+	if (stat(path, &statbuf) == 0) {
+		reg = S_ISREG(statbuf.st_mode);
+	}
+	ti.keystore = NULL;
+	if(reg != 0) {
+		printf("it's a file\n");
+		ti.keystore = path;
+	}
+	ti.policy = tls_policy | (tls_verify ? TPTLS_VERIFY_ALL : 0);
+	ti.verify_depth = tls_depth;
+	ti.verify_date = tls_date;
+	ti.configured = path != tbf;
+	ti.randFile = su_sprintf(autohome, "%s/%s", path, "tls_seed.dat");
+	ti.key = su_sprintf(autohome, "%s/%s", path, "agent.pem");
+	ti.passphrase = su_strdup(autohome, passphrase);
+	ti.cert = ti.key;
+	ti.CAfile = su_sprintf(autohome, "%s/%s", path, "cafile.pem");
+	if (tls_ciphers) ti.ciphers = su_strdup(autohome, tls_ciphers);
+	ti.version = tls_version;
+	ti.CApath = su_strdup(autohome, path);
 
     SU_DEBUG_9(("%s(%p): tls key = %s\n", __func__, (void *)pri, ti.key));
 
@@ -259,6 +291,7 @@ static int tport_tls_init_master(tport_primary_t *pri,
   if (tls_subjects)
     pri->pri_primary->tp_subjects = su_strlst_dup(pri->pri_home, tls_subjects);
   pri->pri_has_tls = 1;
+  pri->pri_params->tls_verify_policy = ti.policy;
 
   return 0;
 }
@@ -687,3 +720,190 @@ sys_error:
   su_seterrno(err);
   return NULL;
 }
+
+
+/** Calculate timeout if receive is incomplete. */
+static int tport_next_recv_timeout(tport_t *self,
+			    su_time_t *return_target,
+			    char const **return_why)
+{
+  unsigned timeout = self->tp_params->tpp_timeout;
+
+  if (timeout < INT_MAX) {
+    /* Recv timeout */
+    if (self->tp_msg) {
+      su_time_t ntime = su_time_add(self->tp_rtime, timeout);
+      if (su_time_cmp(ntime, *return_target) < 0)
+	*return_target = ntime, *return_why = "recv timeout";
+    }
+
+#if 0
+    /* Send timeout */
+    if (tport_has_queued(self)) {
+      su_time_t ntime = su_time_add(self->tp_stime, timeout);
+      if (su_time_cmp(ntime, *return_target) < 0)
+	*return_target = ntime, *return_why = "send timeout";
+    }
+#endif
+  }
+
+  return 0;
+}
+
+/** Timeout timer if receive is incomplete */
+static void tport_recv_timeout_timer(tport_t *self, su_time_t now)
+{
+  unsigned timeout = self->tp_params->tpp_timeout;
+
+  if (timeout < INT_MAX) {
+    if (self->tp_msg &&
+	su_time_cmp(su_time_add(self->tp_rtime, timeout), now) < 0) {
+      msg_t *msg = self->tp_msg;
+      msg_set_streaming(msg, (enum msg_streaming_status)0);
+      msg_set_flags(msg, MSG_FLG_ERROR | MSG_FLG_TRUNC | MSG_FLG_TIMEOUT);
+      tport_deliver(self, msg, NULL, NULL, now);
+      self->tp_msg = NULL;
+    }
+
+#if 0
+    /* Send timeout */
+    if (tport_has_queued(self) &&
+	su_time_cmp(su_time_add(self->tp_stime, timeout), now) < 0) {
+      stime = su_time_add(self->tp_stime, self->tp_params->tpp_timeout);
+      if (su_time_cmp(stime, target) < 0)
+	target = stime;
+    }
+#endif
+  }
+}
+
+/** Calculate next timeout for keepalive */
+static int tport_next_keepalive(tport_t *self,
+			 su_time_t *return_target,
+			 char const **return_why)
+{
+  /* Keepalive timer */
+  unsigned timeout = self->tp_params->tpp_keepalive;
+
+  if (timeout != 0 && timeout != UINT_MAX) {
+    if (!tport_has_queued(self)) {
+      su_time_t ntime = su_time_add(self->tp_ktime, timeout);
+      if (su_time_cmp(ntime, *return_target) < 0)
+        *return_target = ntime, *return_why = "keepalive";
+    }
+  }
+
+  timeout = self->tp_params->tpp_pingpong;
+  if (timeout != 0) {
+    if (self->tp_ptime.tv_sec && !self->tp_recv_close) {
+      su_time_t ntime = su_time_add(self->tp_ptime, timeout);
+      if (su_time_cmp(ntime, *return_target) < 0)
+	*return_target = ntime, *return_why = "waiting for pong";
+    }
+  }
+
+  return 0;
+}
+
+
+/** Keepalive timer. */
+static void tport_keepalive_timer(tport_t *self, su_time_t now)
+{
+  unsigned timeout = self->tp_params->tpp_pingpong;
+
+  if (timeout != 0) {
+    if (self->tp_ptime.tv_sec && !self->tp_recv_close &&
+	su_time_cmp(su_time_add(self->tp_ptime, timeout), now) < 0) {
+      SU_DEBUG_3(("%s(%p): %s to " TPN_FORMAT "%s\n",
+		  __func__, (void *)self,
+		  "closing connection", TPN_ARGS(self->tp_name),
+		  " because of PONG timeout"));
+      tport_error_report(self, EPIPE, NULL);
+      if (!self->tp_closed)
+	tport_close(self);
+      return;
+    }
+  }
+
+  timeout = self->tp_params->tpp_keepalive;
+
+  if (timeout != 0 && timeout != UINT_MAX) {
+    if (su_time_cmp(su_time_add(self->tp_ktime, timeout), now) < 0) {
+      tport_tls_ping(self, now);
+    }
+  }
+}
+
+/** Send PING */
+static int tport_tls_ping(tport_t *self, su_time_t now)
+{
+  ssize_t n;
+  char *why = "";
+  tport_tls_t *tlstp = (tport_tls_t*)self;
+
+  if (tport_has_queued(self))
+    return 0;
+
+  n = tls_write(tlstp->tlstp_context, "\r\n\r\n", 4);
+  if (n == -1) {
+    int error = su_errno();
+
+    why = " failed";
+
+    if (!su_is_blocking(error))
+      tport_error_report(self, error, NULL);
+    else
+      why = " blocking";
+
+    return -1;
+  }
+
+  if (n > 0)
+    self->tp_ktime = now;
+
+  if (n == 4) {
+    if (self->tp_ptime.tv_sec == 0)
+      self->tp_ptime = now;
+  }
+
+  SU_DEBUG_2(("%s(%p): %s to " TPN_FORMAT "%s\n",
+	      __func__, (void *)self,
+	      "sending PING", TPN_ARGS(self->tp_name), why));
+
+  return 0;
+}
+
+
+/** Send pong */
+static int tport_tls_pong(tport_t *self)
+{
+  tport_tls_t *tlstp = (tport_tls_t*)self;
+  self->tp_ping = 0;
+
+  if (tport_has_queued(self) || !self->tp_params->tpp_pong2ping)
+    return 0;
+
+  SU_DEBUG_2(("%s(%p): %s to " TPN_FORMAT "%s\n",
+	      __func__, (void *)self,
+	      "sending PONG", TPN_ARGS(self->tp_name), ""));
+  return tls_write(tlstp->tlstp_context, "\r\n", 2);
+}
+
+/** Calculate next timer for TCP. */
+static int tport_tls_next_timer(tport_t *self,
+			 su_time_t *return_target,
+			 char const **return_why)
+{
+  return
+    tport_next_recv_timeout(self, return_target, return_why) |
+    tport_next_keepalive(self, return_target, return_why);
+}
+
+/** TCP timer. */
+static void tport_tls_timer(tport_t *self, su_time_t now)
+{
+  tport_recv_timeout_timer(self, now);
+  tport_keepalive_timer(self, now);
+  tport_base_timer(self, now);
+}
+
